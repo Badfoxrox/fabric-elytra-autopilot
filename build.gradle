@@ -26,7 +26,6 @@ repositories {
 		url 'https://maven.terraformersmc.com/'
 	}
 	maven {
-		name 'Xander Maven'
 		url 'https://maven.isxander.dev/releases'
 	}
 	mavenCentral()
