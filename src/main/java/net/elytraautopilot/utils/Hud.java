@@ -33,7 +33,7 @@ public class Hud {
         double altitude = player.getPos().y;
         double avgVelocity = 0f;
         double avgHorizontalVelocity = 0f;
-        int gticks = Math.max(1, ModConfig.advanced.groundCheckTicks);
+        int gticks = Math.max(1, ModConfig.groundCheckTicks);
 
         if (_tick >= gticks) {
             _index++;
@@ -66,7 +66,7 @@ public class Hud {
             avgHorizontalVelocity = velocityListHorizontal.stream().mapToDouble(val -> val).average().orElse(0.0);
         }
         if (hudString == null) hudString = new Text[10];
-        if (!ModConfig.gui.showgui || minecraftClient.options.debugEnabled) {
+        if (!ModConfig.showgui || minecraftClient.inGameHud.getDebugHud().shouldShowDebugHud()) {
             hudString[0] = Text.of("");
             hudString[1] = Text.of("");
             hudString[2] = Text.of("");
@@ -89,8 +89,8 @@ public class Hud {
                 .formatted(Formatting.AQUA);
         hudString[3] = Text.translatable("text." + modid + ".hud.neededHeight")
                 .formatted(Formatting.AQUA)
-                .append(Text.literal(groundheight > ModConfig.flightprofile.minHeight ? "Ready" : String.valueOf(Math.round(ModConfig.flightprofile.minHeight-groundheight)))
-                        .formatted(groundheight > ModConfig.flightprofile.minHeight ? Formatting.GREEN : Formatting.RED));
+                .append(Text.literal(groundheight > ModConfig.minHeight ? "Ready" : String.valueOf(Math.round(ModConfig.minHeight-groundheight)))
+                        .formatted(groundheight > ModConfig.minHeight ? Formatting.GREEN : Formatting.RED));
         hudString[4] = Text.translatable("text." + modid + ".hud.speed", String.format("%.2f", currentVelocity * 20))
                 .formatted(Formatting.YELLOW);
         if (avgVelocity == 0f) {
@@ -113,8 +113,8 @@ public class Hud {
             }
             hudString[9] = Text.translatable("text." + modid + ".hud.autoLand")
                     .formatted(Formatting.LIGHT_PURPLE)
-                    .append(Text.translatable(ModConfig.flightprofile.autoLanding ? "text." + modid + ".hud.enabled" : "text." + modid + ".hud.disabled")
-                            .formatted(ModConfig.flightprofile.autoLanding ? Formatting.GREEN : Formatting.RED));
+                    .append(Text.translatable(ModConfig.autoLanding ? "text." + modid + ".hud.enabled" : "text." + modid + ".hud.disabled")
+                            .formatted(ModConfig.autoLanding ? Formatting.GREEN : Formatting.RED));
             if (isLanding) {
                 hudString[8] = Text.translatable("text." + modid + ".hud.landing")
                         .formatted(Formatting.LIGHT_PURPLE);

@@ -19,7 +19,8 @@
     "vadimpronin",
     "HumanoidSandvichDispenser",
     "Cookie_n00b",
-    "RazrCraft"
+    "RazrCraft",
+    "Badfoxrox"
   ],
   "contact": {
     "homepage": "https://github.com/TheMegax/fabric-elytra-autopilot",
@@ -43,10 +44,11 @@
   ],
 
   "depends": {
-    "fabricloader": ">=0.14.21",
+    "fabricloader": ">=0.15.10",
     "fabric-api": "*",
     "minecraft": "~1.20",
-    "java": ">=17"
+    "java": ">=21",
+    "yet_another_config_lib_v3": "*"
   },
   "suggests": {
     "flamingo": "*"
