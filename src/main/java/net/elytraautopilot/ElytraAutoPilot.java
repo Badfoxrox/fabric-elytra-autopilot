@@ -69,7 +69,8 @@ public class ElytraAutoPilot implements ClientModInitializer {
     public static ModConfig getConfig() {
         return config;
     }
-
+    
+    
     @Override
 	public void onInitializeClient() {
         minecraftClient = MinecraftClient.getInstance();
@@ -79,7 +80,7 @@ public class ElytraAutoPilot implements ClientModInitializer {
         ClientTickEvents.END_CLIENT_TICK.register(e -> this.onClientTick());
 
         //config = new ModConfig(MODID);
-        ModConfig.HANDLER.load();
+        ModConfig.GSON.load();
 
         ClientCommands.register(minecraftClient);
     }
@@ -282,7 +283,7 @@ public class ElytraAutoPilot implements ClientModInitializer {
         double velMod;
 
         if (ClientCommands.bufferSave) {
-            ModConfig.HANDLER.save();
+            ModConfig.GSON.save();
             ClientCommands.bufferSave = false;
         }
 
