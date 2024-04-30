@@ -17,7 +17,7 @@
   "config.elytraautopilot.advanced.pullDownMaxVelocity": "Max velocity when going down",
   "config.elytraautopilot.advanced.pullUpSpeed": "Speed to pull up",
   "config.elytraautopilot.advanced.pullDownSpeed": "Speed to pull down",
-  "config.elytraautopilot.advanced.flyLocations": "Fly Locations",
+  "config.elytraautopilot.advanced.flyLocations": "Fly Locations {Name};{X};{Z}",
   "config.elytraautopilot.advanced.groundCheckTicks": "Ticks before checking for ground",
   "config.elytraautopilot.flightprofile.maxHeight": "Max height when flying",
   "config.elytraautopilot.flightprofile.playSoundOnLanding": "Play sound on landing",

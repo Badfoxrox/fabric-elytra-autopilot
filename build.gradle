@@ -60,7 +60,7 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 tasks.withType(JavaCompile).configureEach {
-	// Minecraft 1.18 (1.18-pre2) upwards uses Java 17.
+	// Minecraft 1.20.4 upwards uses Java 21.
 	it.options.getRelease().set(21)
 }
 
@@ -113,7 +113,7 @@ curseforge {
 			displayName = "Elytra AutoPilot ${project.version}"
 			relations {
 				requiredDependency 'fabric-api'
-				optionalDependency 'cloth-config'
+				requiredDependency 'yacl'
 				optionalDependency 'modmenu'
 			}
 		}

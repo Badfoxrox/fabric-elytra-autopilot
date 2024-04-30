@@ -53,7 +53,7 @@
   "text.elytraautopilot.hud.landing": "Aterrizando...",
   "key.elytraautopilot.land": "Aterrizaje Forzoso",
   "key.elytraautopilot.takeoff": "Despegar / Abortar",
-  "config.elytraautopilot.advanced.flyLocations": "Lugar de Vuelo",
+  "config.elytraautopilot.advanced.flyLocations": "Lugar de Vuelo {Nombre};{X};{Z}",
   "config.elytraautopilot.flightprofile.playSoundOnLanding": "Sonido al aterrizar",
   "text.elytraautopilot.landing": "¡Aterrizando!",
   "text.elytraautopilot.flylocation.saved": "Guardado lugar \"%s\" en X: %d, Z: %d",

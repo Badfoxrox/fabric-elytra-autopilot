@@ -2,8 +2,6 @@ package net.elytraautopilot.config;
 
 import com.terraformersmc.modmenu.api.ConfigScreenFactory;
 import com.terraformersmc.modmenu.api.ModMenuApi;
-import net.elytraautopilot.ElytraAutoPilot;
-import net.minecraft.client.MinecraftClient;
 
 
 public class ModMenuIntegration implements ModMenuApi {

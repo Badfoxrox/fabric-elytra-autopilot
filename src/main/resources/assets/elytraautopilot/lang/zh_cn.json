@@ -53,7 +53,7 @@
   "text.elytraautopilot.hud.landing": "降落中...",
   "key.elytraautopilot.land": "迫降",
   "key.elytraautopilot.takeoff": "脱掉 / 中止",
-  "config.elytraautopilot.advanced.flyLocations": "飞行地点",
+  "config.elytraautopilot.advanced.flyLocations": "飞行地点 {名称}；{X}；{Y}",
   "config.elytraautopilot.flightprofile.playSoundOnLanding": "着陆时播放声音",
   "text.elytraautopilot.landing": "现在登陆!",
   "text.elytraautopilot.flylocation.saved": "保存的位置 \"%s\" 在 X: %d, Z: %d",
