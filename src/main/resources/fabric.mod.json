@@ -1,9 +1,7 @@
- 
 {
   "schemaVersion": 1,
   "id": "elytraautopilot",
   "version": "${version}",
-
   "name": "Elytra AutoPilot",
   "description": "Automatic elytra flight with minimal use of fireworks",
   "authors": [
@@ -26,13 +24,11 @@
     "homepage": "https://github.com/TheMegax/fabric-elytra-autopilot",
     "sources": "https://github.com/TheMegax/fabric-elytra-autopilot"
   },
-
   "license": "CC0-1.0",
   "icon": "assets/elytraautopilot/icon.png",
-
   "environment": "client",
   "entrypoints": {
-    "client" : [
+    "client": [
       "net.elytraautopilot.ElytraAutoPilot"
     ],
     "modmenu": [
@@ -42,7 +38,6 @@
   "mixins": [
     "elytraautopilot.mixins.json"
   ],
-
   "depends": {
     "fabricloader": ">=0.15.10",
     "fabric-api": "*",

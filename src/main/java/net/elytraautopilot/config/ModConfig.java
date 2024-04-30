@@ -1,11 +1,13 @@
 package net.elytraautopilot.config;
 
-import dev.isxander.yacl3.api.*;
+import dev.isxander.yacl3.api.ConfigCategory;
+import dev.isxander.yacl3.api.ListOption;
+import dev.isxander.yacl3.api.Option;
+import dev.isxander.yacl3.api.YetAnotherConfigLib;
 import dev.isxander.yacl3.api.controller.*;
 import dev.isxander.yacl3.config.v2.api.ConfigClassHandler;
 import dev.isxander.yacl3.config.v2.api.SerialEntry;
 import dev.isxander.yacl3.config.v2.api.serializer.GsonConfigSerializerBuilder;
-
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
@@ -14,8 +16,7 @@ import net.minecraft.util.Identifier;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ModConfig
-{
+public class ModConfig {
     public static ConfigClassHandler<ModConfig> GSON = ConfigClassHandler.createBuilder(ModConfig.class)
             .id(new Identifier("fabric-elytra-autopilot", "elytraautopilot"))
             .serializer(config -> GsonConfigSerializerBuilder.create(config)
@@ -97,8 +98,7 @@ public class ModConfig
     public static List<String> flyLocations = new ArrayList<>();
     
     
-    public static Screen getConfigScreen(Screen parent)
-    {
+    public static Screen getConfigScreen(Screen parent) {
         return YetAnotherConfigLib.createBuilder()
                 .title(Text.translatable("config.elytraautopilot.title"))
                 
@@ -112,7 +112,7 @@ public class ModConfig
                         .option(Option.<Integer>createBuilder()
                                 .name(Text.translatable("config.elytraautopilot.gui.guiScale"))
                                 .controller(opt -> IntegerSliderControllerBuilder.create(opt)
-                                        .range(0, 300)
+                                        .range(0, 500)
                                         .step(1)
                                         .formatValue(value -> Text.literal(value + " %")))
                                 .binding(100, () -> guiScale, value -> guiScale = value)
@@ -135,7 +135,7 @@ public class ModConfig
                         .option(Option.<Integer>createBuilder()
                                 .name(Text.translatable("config.elytraautopilot.flightprofile.maxHeight"))
                                 .controller(opt -> IntegerSliderControllerBuilder.create(opt)
-                                        .range(0, 500)
+                                        .range(0, 1000)
                                         .step(1)
                                         .formatValue(value -> Text.literal(value + " blocks")))
                                 .binding(360, () -> maxHeight, value -> maxHeight = value)
@@ -216,6 +216,6 @@ public class ModConfig
                                 .build())
                         .build())
                 .save(() -> GSON.save())
-            .build().generateScreen(parent);
+                .build().generateScreen(parent);
     }
 }
