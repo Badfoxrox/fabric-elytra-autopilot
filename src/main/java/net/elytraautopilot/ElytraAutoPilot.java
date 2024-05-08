@@ -155,7 +155,7 @@ public class ElytraAutoPilot implements ClientModInitializer {
                     player.sendMessage(Text.translatable("text." + MODID + ".takeoffAbort.noFirework").formatted(Formatting.RED), true);
                     doGlide = true;
                 }
-            } else minecraftClient.options.useKey.setPressed(currentVelocity < 0.75f && player.getPitch() == -90f);
+            } else minecraftClient.options.useKey.setPressed(player.getVelocity().getY() < 0.75f && player.getPitch() == -90f);
         }
     }
     
