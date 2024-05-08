@@ -1,6 +1,5 @@
 package net.elytraautopilot;
 
-import com.terraformersmc.modmenu.ModMenu;
 import net.elytraautopilot.commands.ClientCommands;
 import net.elytraautopilot.config.ModConfig;
 import net.elytraautopilot.utils.Hud;
@@ -8,9 +7,7 @@ import net.elytraautopilot.utils.KeyBindings;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
-import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -29,248 +26,253 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class ElytraAutoPilot implements ClientModInitializer {
+    // Unchanging things
     public static final String MODID = "elytraautopilot";
     public static final Logger LOGGER = LoggerFactory.getLogger("ElytraAutoPilot");
-    private static boolean configPressed = false;
-    private static boolean landPressed = false;
-    private static boolean takeoffPressed = false;
     public static MinecraftClient minecraftClient;
-    public static boolean calculateHud;
-    public static boolean autoFlight;
-    private static final int TAKEOFF_COOLDOWN_TICKS = 5;
-    private static int takeoffCooldown = 0;
-    private static boolean onTakeoff;
-    public static double pitchMod = 1f;
+    private static final ModConfig config = new ModConfig();
     
+    // Changing things
+    private STATE currentState = STATE.IDLE;
+    public static int destXpos;
+    public static int destZpos;
+    public static double distance = 0d;
+    public static double pitchMod = 1f;
     public static Vec3d previousPosition;
     public static double currentVelocity;
     public static double currentVelocityHorizontal;
+    public static boolean calculateHud;
     
     public static boolean isDescending;
     public static boolean pullUp;
     public static boolean pullDown;
     
-    private static double velHigh = 0f;
-    private static double velLow = 0f;
-    
-    public static int argXpos;
-    public static int argZpos;
-    public static boolean isChained = false;
-    public static boolean isflytoActive = false;
-    public static boolean forceLand = false;
-    public static boolean isLanding = false;
-    public static float GLIDE_ANGLE = 0.0f;
-    public static boolean doGlide = false;
-    public static double distance = 0f;
-    public static double groundheight;
-    
-    private static final ModConfig config = new ModConfig();
     
     public static ModConfig getConfig() {
         return config;
-    }
-    
-    
-    @Override
-    public void onInitializeClient() {
-        minecraftClient = MinecraftClient.getInstance();
-        
-        KeyBindings.init();
-        HudRenderCallback.EVENT.register((matrixStack, tickDelta) -> ElytraAutoPilot.this.onScreenTick());
-        ClientTickEvents.END_CLIENT_TICK.register(e -> this.onClientTick());
-        
-        //config = new ModConfig(MODID);
-        ModConfig.GSON.load();
-        
-        ClientCommands.register(minecraftClient);
     }
     
     public static String getModId() {
         return MODID;
     }
     
-    public static void takeoff() {
+    @Override
+    public void onInitializeClient() {
+        // Get current instance
+        minecraftClient = MinecraftClient.getInstance();
+        
+        // Register Keybinds
+        KeyBindings.init();
+        
+        // Hud rendering once every tick
+        HudRenderCallback.EVENT.register((matrixStack, tickDelta) -> ElytraAutoPilot.this.onScreenTick());
+        
+        // 20 times per second; flying processing before any screen tick
+        ClientTickEvents.END_CLIENT_TICK.register(e -> this.onClientTick());
+        
+        // load saved config
+        ModConfig.GSON.load();
+        
+        ClientCommands.register(minecraftClient);
+    }
+    
+    // Idle: doing nothing, allow full player control
+    // Takeoff: Taking off, look up, and use rockets
+    // Gliding: player control over yaw
+    // Flying to: directed flying
+    // Smooth Landing:
+    // Risky Landing
+    private enum STATE {
+        IDLE, TAKEOFF, GLIDING, FLYING_TO, SMOOTH_LANDING, RISKY_LANDING
+    }
+    
+    private void onScreenTick()
+    {
+        // completely stops the flying logic when paused
+        if (minecraftClient.isPaused())
+        {
+            currentState = STATE.IDLE;
+            return;
+        }
+        
         PlayerEntity player = minecraftClient.player;
-        if (!onTakeoff) {
-            if (player != null) {
-                Item itemMain = player.getMainHandStack().getItem();
-                Item itemOff = player.getOffHandStack().getItem();
-                Item itemChest = player.getInventory().armor.get(2).getItem();
-                int elytraDamage = player.getInventory().armor.get(2).getMaxDamage() - player.getInventory().armor.get(2).getDamage();
-                if (itemChest != Items.ELYTRA) {
+        if (player == null) return;
+        
+        
+        double fpsSpeedAdapt = 60 / (20 / minecraftClient.getLastFrameDuration());
+        
+        
+        switch (currentState) {
+            case IDLE:
+                break;
+            case TAKEOFF: {
+                // Elytra not equipped
+                if (player.getInventory().armor.get(2).getItem() != Items.ELYTRA) {
                     player.sendMessage(Text.translatable("text." + MODID + ".takeoffFail.noElytraEquipped").formatted(Formatting.RED), true);
                     return;
                 }
-                if (elytraDamage == 1) {
+                // Elytra too broken
+                if (player.getInventory().armor.get(2).getMaxDamage() - player.getInventory().armor.get(2).getDamage() == 1) {
                     player.sendMessage(Text.translatable("text." + MODID + ".takeoffFail.elytraBroken").formatted(Formatting.RED), true);
                     return;
                 }
-                if (itemMain != Items.FIREWORK_ROCKET && itemOff != Items.FIREWORK_ROCKET) {
+                // No rockets being held
+                if (player.getMainHandStack().getItem() != Items.FIREWORK_ROCKET && player.getOffHandStack().getItem() != Items.FIREWORK_ROCKET) {
                     player.sendMessage(Text.translatable("text." + MODID + ".takeoffFail.fireworkRequired").formatted(Formatting.RED), true);
                     return;
                 }
                 
-                World world = player.getWorld();
-                Vec3d clientPos = player.getPos();
-                int l = world.getTopY();
-                int n = 2;
-                double c = clientPos.getY();
-                for (double i = c; i < l; i++) {
-                    BlockPos blockPos = BlockPos.ofFloored(clientPos.getX(), clientPos.getY() + n, clientPos.getZ());
+                World world = player.getWorld();;
+                int worldHeight = world.getTopY();
+                int n = 2; // checks every block starting 2 above the player
+                double playerHeight = player.getY();
+                for (double i = playerHeight; i < worldHeight; i++) {
+                    BlockPos blockPos = BlockPos.ofFloored(player.getX(), player.getY() + n, player.getZ());
                     if (!world.getBlockState(blockPos).isAir()) {
                         player.sendMessage(Text.translatable("text." + MODID + ".takeoffFail.clearSkyNeeded").formatted(Formatting.RED), true);
                         return;
                     }
                     n++;
                 }
-                takeoffCooldown = TAKEOFF_COOLDOWN_TICKS;
+                takeoffCooldown = 5;
                 minecraftClient.options.jumpKey.setPressed(true);
             }
-            return;
-        }
-        if (player != null) {
-            if (groundheight > ModConfig.minHeight) {
-                onTakeoff = false;
-                minecraftClient.options.useKey.setPressed(false);
-                minecraftClient.options.jumpKey.setPressed(false);
-                autoFlight = true;
-                pitchMod = 3f;
-                if (isChained) {
-                    isflytoActive = true;
-                    isChained = false;
-                    minecraftClient.inGameHud.getChatHud().addMessage(Text.translatable("text." + MODID + ".flyto", argXpos, argZpos).formatted(Formatting.GREEN));
+                
+                
+                
+                
+                PlayerEntity player = minecraftClient.player;
+                if (!onTakeoff) {
+                    if (player != null) {
+                        Item itemMain = player.getMainHandStack().getItem();
+                        Item itemOff = player.getOffHandStack().getItem();
+                        Item itemChest = player.getInventory().armor.get(2).getItem();
+                        int elytraDamage = player.getInventory().armor.get(2).getMaxDamage() - player.getInventory().armor.get(2).getDamage();
+                        if (itemChest != Items.ELYTRA) {
+                            player.sendMessage(Text.translatable("text." + MODID + ".takeoffFail.noElytraEquipped").formatted(Formatting.RED), true);
+                            return;
+                        }
+                        if (elytraDamage == 1) {
+                            player.sendMessage(Text.translatable("text." + MODID + ".takeoffFail.elytraBroken").formatted(Formatting.RED), true);
+                            return;
+                        }
+                        if (itemMain != Items.FIREWORK_ROCKET && itemOff != Items.FIREWORK_ROCKET) {
+                            player.sendMessage(Text.translatable("text." + MODID + ".takeoffFail.fireworkRequired").formatted(Formatting.RED), true);
+                            return;
+                        }
+                        
+                        World world = player.getWorld();
+                        Vec3d clientPos = player.getPos();
+                        int l = world.getTopY();
+                        int n = 2;
+                        double c = clientPos.getY();
+                        for (double i = c; i < l; i++) {
+                            BlockPos blockPos = BlockPos.ofFloored(clientPos.getX(), clientPos.getY() + n, clientPos.getZ());
+                            if (!world.getBlockState(blockPos).isAir()) {
+                                player.sendMessage(Text.translatable("text." + MODID + ".takeoffFail.clearSkyNeeded").formatted(Formatting.RED), true);
+                                return;
+                            }
+                            n++;
+                        }
+                        takeoffCooldown = TAKEOFF_COOLDOWN_TICKS;
+                        minecraftClient.options.jumpKey.setPressed(true);
+                    }
+                    return;
                 }
-                return;
-            }
-            if (!player.isFallFlying())
-                minecraftClient.options.jumpKey.setPressed(!minecraftClient.options.jumpKey.isPressed());
-            Item itemMain = player.getMainHandStack().getItem();
-            Item itemOff = player.getOffHandStack().getItem();
-            boolean hasFirework = (itemMain == Items.FIREWORK_ROCKET || itemOff == Items.FIREWORK_ROCKET);
-            if (!hasFirework) {
-                if (!tryRestockFirework(player)) {
-                    minecraftClient.options.useKey.setPressed(false);
-                    minecraftClient.options.jumpKey.setPressed(false);
-                    onTakeoff = false;
-                    player.sendMessage(Text.translatable("text." + MODID + ".takeoffAbort.noFirework").formatted(Formatting.RED), true);
-                    doGlide = true;
-                }
-            } else minecraftClient.options.useKey.setPressed(currentVelocity < 0.75f && player.getPitch() == -90f);
-        }
-    }
-    
-    private void onScreenTick() //Once every screen frame
-    {
-        // Stops logic when paused.
-        if (minecraftClient.isPaused()) {
-            doGlide = false;
-            if (minecraftClient.isInSingleplayer()) return;
-        }
-        
-        // Player is null when it isn't currently in a world. Optimization spot here.
-        PlayerEntity player = minecraftClient.player;
-        if (player == null) return;
-        
-        //Fps adaptation (not perfect but works nicely most of the time)
-        float fps_delta = minecraftClient.getLastFrameDuration();
-        float fps_result = 20 / fps_delta;
-        double speedMod = 60 / fps_result; //Adapt to base 60 FPS
-        
-        // Calculate hard coded flight modes based on pitch.
-        float pitch = player.getPitch();
-        if (doGlide) {
-            if (pitch < GLIDE_ANGLE) {
-                player.setPitch((float) (pitch + ModConfig.pullDownSpeed * speedMod * 3));
-                pitch = player.getPitch();
-                if (pitch >= GLIDE_ANGLE) {
-                    player.setPitch(GLIDE_ANGLE);
-                    doGlide = false;
-                }
-            } else if (pitch > GLIDE_ANGLE) {
-                player.setPitch((float) (pitch - ModConfig.pullDownSpeed * speedMod) * 3);
-                pitch = player.getPitch();
-                if (pitch <= GLIDE_ANGLE) {
-                    player.setPitch(GLIDE_ANGLE);
-                    doGlide = false;
-                }
-            }
-        } else if (onTakeoff) {
-            if (pitch > -90f) {
-                player.setPitch((float) (pitch - ModConfig.takeOffPull * speedMod));
-                pitch = player.getPitch();
-            }
-            if (pitch <= -90f) player.setPitch(-90f); // Very stiff and unnatural movement
-        }
-        if (autoFlight) {
-            // Flyto behavior
-            if (isflytoActive || forceLand) {
-                if (isLanding || forceLand) {
-                    if (!forceLand && !ModConfig.autoLanding) {
-                        isflytoActive = false;
-                        isLanding = false;
+                if (player != null) {
+                    if (groundheight > ModConfig.minHeight) {
+                        onTakeoff = false;
+                        minecraftClient.options.useKey.setPressed(false);
+                        minecraftClient.options.jumpKey.setPressed(false);
+                        autoFlight = true;
+                        pitchMod = 3f;
+                        if (isChained) {
+                            isflytoActive = true;
+                            isChained = false;
+                            minecraftClient.inGameHud.getChatHud().addMessage(Text.translatable("text." + MODID + ".flyto", argXpos, argZpos).formatted(Formatting.GREEN));
+                        }
                         return;
                     }
-                    isDescending = true;
-                    if (ModConfig.riskyLanding && groundheight > 70) {
-                        riskyLanding(player, speedMod);
-                    } else {
-                        smoothLanding(player, speedMod);
-                    }
-                } else {
-                    Vec3d playerPosition = player.getPos();
-                    double f = (double) argXpos - playerPosition.x;
-                    double d = (double) argZpos - playerPosition.z;
-                    float targetYaw = MathHelper.wrapDegrees((float) (MathHelper.atan2(d, f) * 57.2957763671875D) - 90.0F);
-                    float yaw = MathHelper.wrapDegrees(player.getYaw());
-                    if (Math.abs(yaw - targetYaw) < ModConfig.turningSpeed * 2 * speedMod) player.setYaw(targetYaw);
-                    else {
-                        if (yaw < targetYaw) player.setYaw((float) (yaw + ModConfig.turningSpeed * speedMod));
-                        if (yaw > targetYaw) player.setYaw((float) (yaw - ModConfig.turningSpeed * speedMod));
-                    }
-                    distance = Math.sqrt(f * f + d * d);
-                    if (distance < 20) {
-                        player.sendMessage(Text.translatable("text.elytraautopilot.landing").formatted(Formatting.BLUE), true);
+                    if (!player.isFallFlying())
+                        minecraftClient.options.jumpKey.setPressed(!minecraftClient.options.jumpKey.isPressed());
+                    Item itemMain = player.getMainHandStack().getItem();
+                    Item itemOff = player.getOffHandStack().getItem();
+                    boolean hasFirework = (itemMain == Items.FIREWORK_ROCKET || itemOff == Items.FIREWORK_ROCKET);
+                    if (!hasFirework) {
+                        if (!tryRestockFirework(player)) {
+                            minecraftClient.options.useKey.setPressed(false);
+                            minecraftClient.options.jumpKey.setPressed(false);
+                            onTakeoff = false;
+                            player.sendMessage(Text.translatable("text." + MODID + ".takeoffAbort.noFirework").formatted(Formatting.RED), true);
+                            shouldRecenter = true;
+                        }
+                    } else minecraftClient.options.useKey.setPressed(player.getVelocity().getY() < 0.75f && player.getPitch() == -90f);
+                }
+                break;
+            case FLYING_TO:
+                Vec3d playerPosition = player.getPos();
+                double distanceDiffX = (double) destXpos - playerPosition.x;
+                double distanceDiffZ = (double) destZpos - playerPosition.z;
+                float targetYaw = MathHelper.wrapDegrees((float) (MathHelper.atan2(distanceDiffZ, distanceDiffX) * 57.2957763671875D) - 90.0F);
+                float yaw = MathHelper.wrapDegrees(player.getYaw());
+                if (Math.abs(yaw - targetYaw) < ModConfig.turningSpeed * 2 * fpsSpeedAdapt) player.setYaw(targetYaw);
+                else {
+                    if (yaw < targetYaw) player.setYaw((float) (yaw + ModConfig.turningSpeed * fpsSpeedAdapt));
+                    if (yaw > targetYaw) player.setYaw((float) (yaw - ModConfig.turningSpeed * fpsSpeedAdapt));
+                }
+                distance = Math.sqrt(distanceDiffX * distanceDiffX + distanceDiffZ * distanceDiffZ);
+                if (distance < 20) {
+                    if (!ModConfig.canAutoLand)
+                    {
+                        player.sendMessage(Text.of("Arrived at Destination"), true);
                         SoundEvent soundEvent = SoundEvent.of(new Identifier(ModConfig.playSoundOnLanding));
                         player.playSound(soundEvent, 1.3f, 1f);
-                        isLanding = true;
+                        currentState = STATE.IDLE;
+                        break;
                     }
+                    player.sendMessage(Text.translatable("text.elytraautopilot.landing").formatted(Formatting.BLUE), true);
+                    SoundEvent soundEvent = SoundEvent.of(new Identifier(ModConfig.playSoundOnLanding));
+                    player.playSound(soundEvent, 1.3f, 1f);
+                    if(ModConfig.riskyLanding && ModConfig.canAutoLand)
+                    {
+                        currentState = STATE.RISKY_LANDING;
+                    } else if (ModConfig.canAutoLand){
+                        currentState = STATE.SMOOTH_LANDING;
+                    }
+                    break;
                 }
-            }
-            // Flight pitch behavior
-            if (pullUp && !(isLanding || forceLand)) {
-                player.setPitch((float) (pitch - ModConfig.pullUpSpeed * speedMod));
-                pitch = player.getPitch();
-                if (pitch <= ModConfig.pullUpAngle) {
-                    player.setPitch((float) ModConfig.pullUpAngle);
+            case GLIDING:
+                // Flight pitch behavior
+                float pitch = player.getPitch();
+                if (pullUp) {
+                    player.setPitch((float) (pitch - ModConfig.pullUpSpeed * fpsSpeedAdapt));
+                    pitch = player.getPitch();
+                    if (pitch <= ModConfig.pullUpAngle) {
+                        player.setPitch((float) ModConfig.pullUpAngle);
+                    }
+                    // Powered flight behavior
+                    minecraftClient.options.useKey.setPressed(ModConfig.poweredFlight && currentVelocity < 1.25f);
                 }
-                // Powered flight behavior
-                minecraftClient.options.useKey.setPressed(ModConfig.poweredFlight && currentVelocity < 1.25f);
-            }
-            if (pullDown && !(isLanding || forceLand)) {
-                player.setPitch((float) (pitch + ModConfig.pullDownSpeed * pitchMod * speedMod));
-                pitch = player.getPitch();
-                if (pitch >= ModConfig.pullDownAngle) {
-                    player.setPitch((float) ModConfig.pullDownAngle);
+                if (pullDown) {
+                    player.setPitch((float) (pitch + ModConfig.pullDownSpeed * pitchMod * fpsSpeedAdapt));
+                    pitch = player.getPitch();
+                    if (pitch >= ModConfig.pullDownAngle) {
+                        player.setPitch((float) ModConfig.pullDownAngle);
+                    }
+                    // Powered flight behavior
+                    minecraftClient.options.useKey.setPressed(ModConfig.poweredFlight && currentVelocity < 1.25f);
                 }
-                // Powered flight behavior
-                minecraftClient.options.useKey.setPressed(ModConfig.poweredFlight && currentVelocity < 1.25f);
-            }
-        } else {
-            velHigh = 0f;
-            velLow = 0f;
-            isLanding = false;
-            forceLand = false;
-            isflytoActive = false;
-            pullUp = false;
-            pitchMod = 1f;
-            pullDown = false;
+                break;
+            case SMOOTH_LANDING:
+                break;
+            case RISKY_LANDING:
+                break;
         }
     }
     
-    private void onClientTick() //20 times a second, before first screen tick
+    private void onClientTick()
     {
         if (!(minecraftClient.isPaused() && minecraftClient.isInSingleplayer())) Hud.tick();
-        double velMod;
         
         if (ClientCommands.bufferSave) {
             ModConfig.GSON.save();
@@ -279,36 +281,40 @@ public class ElytraAutoPilot implements ClientModInitializer {
         
         PlayerEntity player = minecraftClient.player;
         
-        if (player == null) {
-            autoFlight = false;
-            onTakeoff = false;
+        if(player == null){
+            currentState = STATE.IDLE;
             return;
         }
         
-        if (player.isFallFlying())
+        if(player.isFallFlying())
+        {
             calculateHud = true;
-        else {
+        } else {
             calculateHud = false;
-            autoFlight = false;
-            groundheight = -1f;
         }
         
-        double altitude;
-        if (autoFlight) {
-            // Elytra hotswap
+        if(currentState.equals(STATE.FLYING_TO) || currentState.equals(STATE.GLIDING))
+        {
             if (!tryRestockElytra(player) && ModConfig.emergencyLand) {
-                forceLand = true;
-            }
-            
-            altitude = player.getPos().y;
-            
-            if (player.isTouchingWater() || player.isInLava()) {
-                isflytoActive = false;
-                isLanding = false;
-                autoFlight = false;
+                player.sendMessage(Text.of("Elytra durability low, landing now!"), true);
+                if(ModConfig.riskyLanding)
+                {
+                    currentState = STATE.RISKY_LANDING;
+                } else {
+                    currentState = STATE.SMOOTH_LANDING;
+                }
                 return;
             }
             
+            if (player.isTouchingWater() || player.isInLava())
+            {
+                currentState = STATE.IDLE;
+                return;
+            }
+            float velHigh = 0f;
+            float velLow = 0f;
+            
+            double altitude = player.getY();
             if (isDescending) {
                 pullUp = false;
                 pullDown = true;
@@ -317,16 +323,13 @@ public class ElytraAutoPilot implements ClientModInitializer {
                 } else if (altitude > ModConfig.maxHeight - 10) {
                     velLow = 0.28475f;
                 }
-                velMod = Math.max(velHigh, velLow);
-                if (currentVelocity >= ModConfig.pullDownMaxVelocity + velMod) {
+                if (currentVelocity >= ModConfig.pullDownMaxVelocity + Math.max(velHigh, velLow)) {
                     isDescending = false;
                     pullDown = false;
                     pullUp = true;
                     pitchMod = 1f;
                 }
             } else {
-                velHigh = 0f;
-                velLow = 0f;
                 pullUp = true;
                 pullDown = false;
                 if (currentVelocity <= ModConfig.pullUpMinVelocity || altitude > ModConfig.maxHeight - 10) {
@@ -336,97 +339,6 @@ public class ElytraAutoPilot implements ClientModInitializer {
                 }
             }
         }
-        if (!takeoffPressed && KeyBindings.takeoffBinding.isPressed()) {
-            if (onTakeoff) {
-                onTakeoff = false;
-                minecraftClient.options.useKey.setPressed(false);
-                minecraftClient.options.jumpKey.setPressed(false);
-                doGlide = true;
-            } else {
-                takeoff();
-            }
-        }
-        
-        if (!landPressed && KeyBindings.landBinding.isPressed() && autoFlight) {
-            player.sendMessage(Text.translatable("text.elytraautopilot.landing").formatted(Formatting.BLUE), true);
-            SoundEvent soundEvent = SoundEvent.of(new Identifier(ModConfig.playSoundOnLanding));
-            player.playSound(soundEvent, 1.3f, 1f);
-            minecraftClient.options.useKey.setPressed(false);
-            forceLand = true;
-        }
-        
-        if (!configPressed && KeyBindings.configBinding.isPressed()) {
-            if (player.isFallFlying()) {
-                if (!autoFlight && groundheight < ModConfig.minHeight) {
-                    player.sendMessage(Text.translatable("text." + MODID + ".autoFlightFail.tooLow").formatted(Formatting.RED), true);
-                    doGlide = true;
-                } else {
-                    // If the player is flying an elytra, we start the auto flight
-                    autoFlight = !autoFlight;
-                    minecraftClient.options.useKey.setPressed(false);
-                    if (autoFlight) {
-                        isDescending = true;
-                        pitchMod = 3f;
-                    }
-                }
-            } else {
-                // Otherwise, we open the settings if cloth is loaded
-                if (FabricLoader.getInstance().isModLoaded("cloth-config")) {
-                    Screen configScreen = ModMenu.getConfigScreen(MODID, minecraftClient.currentScreen);
-                    minecraftClient.setScreen(configScreen);
-                }
-            }
-        }
-        configPressed = KeyBindings.configBinding.isPressed();
-        landPressed = KeyBindings.landBinding.isPressed();
-        takeoffPressed = KeyBindings.takeoffBinding.isPressed();
-        
-        if (takeoffCooldown > 0) {
-            if (--takeoffCooldown == 0) onTakeoff = true;
-        }
-        
-        if (onTakeoff) {
-            takeoff();
-        }
-        
-        if (calculateHud) {
-            computeVelocity();
-            Hud.drawHud(player);
-        } else {
-            previousPosition = null;
-            Hud.clearHud();
-        }
-    }
-    
-    private static boolean tryRestockFirework(PlayerEntity player) {
-        if (ModConfig.fireworkHotswap) {
-            ItemStack newFirework = null;
-            for (ItemStack itemStack : player.getInventory().main) {
-                if (itemStack.getItem() == Items.FIREWORK_ROCKET) {
-                    newFirework = itemStack;
-                    break;
-                }
-            }
-            if (newFirework != null) {
-                int handSlot;
-                if (player.getOffHandStack().isEmpty()) {
-                    handSlot = 45; //Offhand slot refill
-                } else {
-                    handSlot = 36 + player.getInventory().selectedSlot; //Mainhand slot refill
-                }
-                
-                assert minecraftClient.interactionManager != null;
-                minecraftClient.interactionManager.clickSlot(
-                        player.playerScreenHandler.syncId,
-                        handSlot,
-                        player.getInventory().main.indexOf(newFirework),
-                        SlotActionType.SWAP,
-                        player
-                );
-                return true;
-            }
-        }
-        return false;
     }
     
     private static boolean tryRestockElytra(PlayerEntity player) {
@@ -465,6 +377,38 @@ public class ElytraAutoPilot implements ClientModInitializer {
         return true;
     }
     
+    private static boolean tryRestockFirework(PlayerEntity player) {
+        if (ModConfig.fireworkHotswap) {
+            ItemStack newFirework = null;
+            
+            for (ItemStack itemStack : player.getInventory().main) {
+                if (itemStack.getItem() == Items.FIREWORK_ROCKET) {
+                    newFirework = itemStack;
+                    break;
+                }
+            }
+            if (newFirework != null) {
+                int handSlot;
+                if (player.getOffHandStack().isEmpty()) {
+                    handSlot = 45; //Offhand slot refill
+                } else {
+                    handSlot = 36 + player.getInventory().selectedSlot; //Mainhand slot refill
+                }
+                
+                assert minecraftClient.interactionManager != null;
+                minecraftClient.interactionManager.clickSlot(
+                        player.playerScreenHandler.syncId,
+                        handSlot,
+                        player.getInventory().main.indexOf(newFirework),
+                        SlotActionType.SWAP,
+                        player
+                );
+                return true;
+            }
+        }
+        return false;
+    }
+    
     private void computeVelocity() {
         Vec3d newPosition;
         PlayerEntity player = minecraftClient.player;
@@ -480,34 +424,5 @@ public class ElytraAutoPilot implements ClientModInitializer {
             currentVelocity = difference.length();
             currentVelocityHorizontal = difference_horizontal.length();
         }
-    }
-    
-    private void smoothLanding(PlayerEntity player, double speedMod) {
-        float yaw = MathHelper.wrapDegrees(player.getYaw());
-        float pitch = MathHelper.wrapDegrees(player.getPitch());
-        float fallPitchMax = 60f;
-        float fallPitchMin = 20f;
-        float fallPitch;
-        if (groundheight > 50) {
-            fallPitch = fallPitchMax;
-        } else if (groundheight < 20) {
-            fallPitch = fallPitchMin;
-        } else {
-            fallPitch = (float) ((groundheight - 20) / 30) * 20 + fallPitchMin;
-        }
-        pitchMod = 3f;
-        player.setYaw((float) (yaw + ModConfig.autoLandSpeed * speedMod));
-        player.setPitch((float) (pitch + ModConfig.pullDownSpeed * pitchMod * speedMod));
-        pitch = player.getPitch();
-        if (pitch >= fallPitch) {
-            player.setPitch(fallPitch);
-        }
-    }
-    
-    private void riskyLanding(PlayerEntity player, double speedMod) {
-        float pitch = player.getPitch();
-        player.setPitch((float) (pitch + ModConfig.takeOffPull * speedMod));
-        pitch = player.getPitch();
-        if (pitch > 90f) player.setPitch(90f);
     }
 }

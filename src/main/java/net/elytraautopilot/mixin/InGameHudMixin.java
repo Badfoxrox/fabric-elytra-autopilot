@@ -1,6 +1,6 @@
 package net.elytraautopilot.mixin;
 
-import net.elytraautopilot.ElytraAutoPilot;
+import net.elytraautopilot.old.ElytraAutoPilot;
 import net.elytraautopilot.config.ModConfig;
 import net.elytraautopilot.utils.Hud;
 import net.minecraft.client.MinecraftClient;

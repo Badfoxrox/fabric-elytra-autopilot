@@ -32,6 +32,7 @@ public class Hud {
         MinecraftClient minecraftClient = MinecraftClient.getInstance();
         
         double altitude = player.getPos().y;
+        double groundheight;
         double avgVelocity = 0f;
         double avgHorizontalVelocity = 0f;
         int gticks = Math.max(1, ModConfig.groundCheckTicks);
@@ -111,8 +112,8 @@ public class Hud {
             }
             hudString[9] = Text.translatable("text." + modid + ".hud.autoLand")
                     .formatted(Formatting.LIGHT_PURPLE)
-                    .append(Text.translatable(ModConfig.autoLanding ? "text." + modid + ".hud.enabled" : "text." + modid + ".hud.disabled")
-                            .formatted(ModConfig.autoLanding ? Formatting.GREEN : Formatting.RED));
+                    .append(Text.translatable(ModConfig.canAutoLand ? "text." + modid + ".hud.enabled" : "text." + modid + ".hud.disabled")
+                            .formatted(ModConfig.canAutoLand ? Formatting.GREEN : Formatting.RED));
             if (isLanding) {
                 hudString[8] = Text.translatable("text." + modid + ".hud.landing")
                         .formatted(Formatting.LIGHT_PURPLE);

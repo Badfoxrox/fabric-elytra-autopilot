@@ -2,7 +2,7 @@ package net.elytraautopilot.commands;
 
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
-import net.elytraautopilot.ElytraAutoPilot;
+import net.elytraautopilot.old.ElytraAutoPilot;
 import net.elytraautopilot.config.ModConfig;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;

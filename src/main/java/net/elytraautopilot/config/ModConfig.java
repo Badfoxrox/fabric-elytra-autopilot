@@ -44,7 +44,7 @@ public class ModConfig {
     public static int minHeight = 180;
     
     @SerialEntry
-    public static boolean autoLanding = true;
+    public static boolean canAutoLand = true;
     
     @SerialEntry
     public static String playSoundOnLanding = "minecraft:block.note_block.pling";
@@ -151,7 +151,7 @@ public class ModConfig {
                         .option(Option.<Boolean>createBuilder()
                                 .name(Text.translatable("config.elytraautopilot.flightprofile.autoLanding"))
                                 .controller(TickBoxControllerBuilder::create)
-                                .binding(true, () -> autoLanding, value -> autoLanding = value)
+                                .binding(true, () -> canAutoLand, value -> canAutoLand = value)
                                 .build())
                         .option(Option.<String>createBuilder()
                                 .name(Text.translatable("config.elytraautopilot.flightprofile.playSoundOnLanding"))

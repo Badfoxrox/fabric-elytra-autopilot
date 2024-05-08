@@ -29,7 +29,7 @@
   "environment": "client",
   "entrypoints": {
     "client": [
-      "net.elytraautopilot.ElytraAutoPilot"
+      "net.elytraautopilot.old.ElytraAutoPilot"
     ],
     "modmenu": [
       "net.elytraautopilot.config.ModMenuIntegration"
